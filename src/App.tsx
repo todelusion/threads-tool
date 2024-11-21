@@ -1,11 +1,21 @@
 import React, { useState, useCallback } from "react";
 import { ImagePlus, Trash2, AlertCircle, Send, FileText } from "lucide-react";
 import removeMd from "remove-markdown";
+import { marked, Tokens } from "marked";
+import { CodeToImage, generateCodeImage } from "./components/CodeToImage";
+import * as htmlToImage from "html-to-image";
+import { createRoot } from "react-dom/client";
 
 interface MediaItem {
   id: string;
   url: string;
   type: "image" | "video";
+}
+
+interface CodeBlockImage {
+  id: string;
+  imageUrl: string;
+  originalCode: string;
 }
 
 function App() {
@@ -14,41 +24,52 @@ function App() {
   const [preview, setPreview] = useState<string[]>([]);
   const [isConverted, setIsConverted] = useState(false);
   const [originalContent, setOriginalContent] = useState("");
+  const [codeBlockImages, setCodeBlockImages] = useState<CodeBlockImage[]>([]);
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
     setContent(newContent);
     if (!isConverted) {
       setOriginalContent(newContent);
+      setPreview([newContent]);
+    } else {
+      updatePreview(newContent);
     }
-    updatePreview(newContent);
   };
 
-  const updatePreview = useCallback((text: string) => {
-    if (!text) {
-      setPreview([]);
-      return;
-    }
-
-    const words = text.split(" ");
-    const posts: string[] = [];
-    let currentPost = "";
-
-    words.forEach((word) => {
-      if ((currentPost + " " + word).trim().length <= 500) {
-        currentPost = (currentPost + " " + word).trim();
-      } else {
-        posts.push(currentPost);
-        currentPost = word;
+  const updatePreview = useCallback(
+    (text: string) => {
+      if (!text) {
+        setPreview([]);
+        return;
       }
-    });
 
-    if (currentPost) {
-      posts.push(currentPost);
-    }
+      if (!isConverted) {
+        setPreview([text]);
+        return;
+      }
 
-    setPreview(posts);
-  }, []);
+      const posts: string[] = [];
+      const lines = text.split("\n");
+      let currentPost = "";
+
+      lines.forEach((line) => {
+        if (currentPost && (currentPost + "\n" + line).length > 500) {
+          posts.push(currentPost);
+          currentPost = line;
+        } else {
+          currentPost = currentPost ? currentPost + "\n" + line : line;
+        }
+      });
+
+      if (currentPost) {
+        posts.push(currentPost);
+      }
+
+      setPreview(posts);
+    },
+    [isConverted]
+  );
 
   const handleMediaAdd = () => {
     if (media.length >= 10) return;
@@ -75,49 +96,101 @@ function App() {
     setPreview([]);
   };
 
-  const convertToThreads = useCallback(() => {
+  const convertToThreads = useCallback(async () => {
     setOriginalContent(content);
 
-    const lines = content.split("\n");
-    let currentThread = "";
-    const threads: string[] = [];
+    const tokens = marked.lexer(content);
+    let processedContent = content;
+    const newCodeBlockImages: CodeBlockImage[] = [];
 
-    lines.forEach((line) => {
-      const cleanLine = removeMd(line);
+    for (const token of tokens) {
+      if (token.type === "code") {
+        const codeBlock = token as Tokens.Code;
+        const id = Math.random().toString(36).substring(7);
 
-      if (!cleanLine.trim() && currentThread.trim()) {
-        threads.push(currentThread.trim());
-        currentThread = "";
-        return;
+        const imageUrl = await generateCodeImage(
+          codeBlock.text,
+          codeBlock.lang || "plaintext"
+        );
+
+        if (imageUrl) {
+          newCodeBlockImages.push({
+            id,
+            imageUrl,
+            originalCode: codeBlock.text,
+          });
+
+          const codeBlockRegex = new RegExp(
+            "```" +
+              (codeBlock.lang || "") +
+              "\\n" +
+              escapeRegExp(codeBlock.text) +
+              "\\n```",
+            "g"
+          );
+          processedContent = processedContent.replace(
+            codeBlockRegex,
+            `[Code Image ${id}]`
+          );
+        }
       }
-
-      if (!cleanLine.trim()) return;
-
-      if (currentThread) {
-        currentThread += "\n";
-      }
-      currentThread += cleanLine;
-
-      if (currentThread.length > 450) {
-        threads.push(currentThread.trim());
-        currentThread = "";
-      }
-    });
-
-    if (currentThread.trim()) {
-      threads.push(currentThread.trim());
     }
 
-    setContent(threads.join("\n\n"));
-    updatePreview(threads.join("\n\n"));
+    setCodeBlockImages(newCodeBlockImages);
+    setContent(processedContent);
+    updatePreview(processedContent);
     setIsConverted(true);
   }, [content]);
 
   const revertFromThreads = useCallback(() => {
     setContent(originalContent);
     updatePreview(originalContent);
+    setCodeBlockImages([]);
     setIsConverted(false);
   }, [originalContent]);
+
+  const parseCodeBlocks = (content: string) => {
+    const tokens = marked.lexer(content);
+    const codeBlocks = tokens.filter(
+      (token) => token.type === "code"
+    ) as Tokens.Code[];
+
+    return codeBlocks.map((block) => ({
+      code: block.text,
+      language: block.lang || "plaintext",
+    }));
+  };
+
+  const codeBlocks = parseCodeBlocks(content);
+
+  const escapeRegExp = (string: string) => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  };
+
+  const renderPreviewContent = (post: string) => {
+    // 尋找所有 [Code Image id] 的匹配
+    const parts = post.split(/(\[Code Image [^\]]+\])/);
+
+    return parts.map((part, index) => {
+      // 檢查是否為代碼圖片標記
+      const match = part.match(/\[Code Image ([^\]]+)\]/);
+      if (match) {
+        const imageId = match[1];
+        const codeImage = codeBlockImages.find((img) => img.id === imageId);
+        if (codeImage) {
+          return (
+            <img
+              key={index}
+              src={codeImage.imageUrl}
+              alt="Code snippet"
+              className="max-w-full my-2 rounded"
+            />
+          );
+        }
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-[#101010] text-white">
@@ -127,7 +200,7 @@ function App() {
             value={content}
             onChange={handleContentChange}
             placeholder="Start a thread..."
-            className="w-full min-h-[120px] p-0 border-none focus:ring-0 resize-none text-[17px] 
+            className="w-full min-h-[120px] p-0 border-none focus:ring-0 text-[17px] 
             bg-transparent text-white placeholder:text-gray-400"
           />
 
@@ -203,7 +276,7 @@ function App() {
                   key={index}
                   className="p-4 border border-gray-800 rounded-lg text-[15px] text-white whitespace-pre-line"
                 >
-                  {post}
+                  {renderPreviewContent(post)}
                 </div>
               ))}
             </div>
