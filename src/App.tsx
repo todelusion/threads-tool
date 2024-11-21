@@ -21,6 +21,12 @@ interface MediaItem {
   type: "image" | "video";
 }
 
+interface TableImage {
+  id: string;
+  imageUrl: string;
+  originalTable: string;
+}
+
 interface CodeBlockImage {
   id: string;
   imageUrl: string;
@@ -56,6 +62,8 @@ function App() {
   const [cursorPosition, setCursorPosition] = useState(0);
   const previewRef = React.useRef<HTMLDivElement>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [tableImages, setTableImages] = useState<TableImage[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const debouncedProcessContent = useCallback(
     debounce(async (text: string) => {
@@ -72,7 +80,7 @@ function App() {
   };
 
   const processContentWithCodeBlocks = useCallback(async (text: string) => {
-    if (!text.includes("```")) {
+    if (!text.includes("```") && !text.includes("|")) {
       updatePreview(removeMd(text));
       return;
     }
@@ -80,6 +88,7 @@ function App() {
     const tokens = marked.lexer(text);
     let processedContent = text;
     const newCodeBlockImages: CodeBlockImage[] = [];
+    const newTableImages: TableImage[] = [];
 
     const codeBlockPromises = tokens
       .filter((token): token is Tokens.Code => token.type === "code")
@@ -93,9 +102,76 @@ function App() {
         return { codeBlock, id, imageUrl };
       });
 
-    const results = await Promise.all(codeBlockPromises);
+    const tablePromises = tokens
+      .filter((token): token is Tokens.Table => token.type === "table")
+      .map(async (table) => {
+        const id = Math.random().toString(36).substring(7);
 
-    for (const { codeBlock, id, imageUrl } of results) {
+        const processCellContent = (cell: any): string => {
+          if (cell === null || cell === undefined || cell === "") return "";
+          if (typeof cell === "object") {
+            if (cell.text !== undefined) return cell.text;
+            if (cell.tokens && cell.tokens.length > 0) {
+              return cell.tokens.map((t: any) => t.text || "").join("");
+            }
+            return "";
+          }
+          return String(cell);
+        };
+
+        const headerCells = table.header.map(processCellContent);
+        const bodyRows = table.rows.map((row) => row.map(processCellContent));
+
+        const tableHtml = `
+          <div style="padding: 1rem; background: #1e1e1e; border-radius: 8px; color: white;">
+            <table style="border-collapse: collapse; width: 100%;">
+              <thead>
+                <tr>
+                  ${headerCells
+                    .map(
+                      (cell) =>
+                        `<th style="border: 1px solid #404040; padding: 8px; text-align: left;">${
+                          cell || ""
+                        }</th>`
+                    )
+                    .join("")}
+                </tr>
+              </thead>
+              <tbody>
+                ${bodyRows
+                  .map(
+                    (row) =>
+                      `<tr>${row
+                        .map(
+                          (cell) =>
+                            `<td style="border: 1px solid #404040; padding: 8px;">${
+                              cell || ""
+                            }</td>`
+                        )
+                        .join("")}</tr>`
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        `;
+
+        const tempDiv = document.createElement("div");
+        tempDiv.innerHTML = tableHtml;
+        document.body.appendChild(tempDiv);
+
+        const imageUrl = await htmlToImage.toPng(tempDiv);
+        document.body.removeChild(tempDiv);
+
+        return { table, id, imageUrl };
+      });
+
+    const [codeResults, tableResults] = await Promise.all([
+      Promise.all(codeBlockPromises),
+      Promise.all(tablePromises),
+    ]);
+
+    for (const { codeBlock, id, imageUrl } of codeResults) {
       if (imageUrl) {
         newCodeBlockImages.push({
           id,
@@ -115,6 +191,22 @@ function App() {
         processedContent = processedContent.replace(
           codeBlockRegex,
           `[Code Image ${id}]`
+        );
+      }
+    }
+
+    for (const { table, id, imageUrl } of tableResults) {
+      if (imageUrl) {
+        newTableImages.push({
+          id,
+          imageUrl,
+          originalTable: table.raw,
+        });
+
+        const tableRegex = new RegExp(escapeRegExp(table.raw), "g");
+        processedContent = processedContent.replace(
+          tableRegex,
+          `[Table Image ${id}]`
         );
       }
     }
@@ -141,6 +233,7 @@ function App() {
       .replace(/\n\s*\n/g, "\n\n")
       .trim();
 
+    setTableImages(newTableImages);
     setCodeBlockImages(newCodeBlockImages);
     updatePreview(plainText);
   }, []);
@@ -196,12 +289,14 @@ function App() {
   };
 
   const renderPreviewContent = (post: string) => {
-    const parts = post.split(/(\[Code Image [^\]]+\])/);
+    const parts = post.split(/(\[(?:Code|Table) Image [^\]]+\])/);
 
     return parts.map((part, index) => {
-      const match = part.match(/\[Code Image ([^\]]+)\]/);
-      if (match) {
-        const imageId = match[1];
+      const codeMatch = part.match(/\[Code Image ([^\]]+)\]/);
+      const tableMatch = part.match(/\[Table Image ([^\]]+)\]/);
+
+      if (codeMatch) {
+        const imageId = codeMatch[1];
         const codeImage = codeBlockImages.find((img) => img.id === imageId);
         if (codeImage) {
           const tokens = marked.lexer(originalContent);
@@ -215,6 +310,20 @@ function App() {
               key={index}
               code={codeImage.originalCode}
               language={codeBlock?.lang || "plaintext"}
+            />
+          );
+        }
+      } else if (tableMatch) {
+        const imageId = tableMatch[1];
+        const tableImage = tableImages.find((img) => img.id === imageId);
+        if (tableImage) {
+          return (
+            <img
+              key={index}
+              src={tableImage.imageUrl}
+              alt="Table"
+              className="max-w-full rounded-lg my-2 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setSelectedImage(tableImage.imageUrl)}
             />
           );
         }
@@ -312,6 +421,32 @@ function App() {
     });
   }, []);
 
+  const Modal = ({
+    imageUrl,
+    onClose,
+  }: {
+    imageUrl: string;
+    onClose: () => void;
+  }) => {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="relative max-w-[90vw] max-h-[90vh]">
+          <button
+            onClick={onClose}
+            className="absolute -top-4 -right-4 w-8 h-8 bg-white text-black rounded-full flex items-center justify-center hover:bg-gray-200"
+          >
+            ×
+          </button>
+          <img
+            src={imageUrl}
+            alt="Table Preview"
+            className="rounded-lg max-w-full max-h-[90vh] object-contain"
+          />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[#101010] text-white">
       <div className="max-w-6xl mx-auto px-4 pt-20 pb-4">
@@ -363,6 +498,12 @@ function App() {
           </div>
         </div>
       </div>
+      {selectedImage && (
+        <Modal
+          imageUrl={selectedImage}
+          onClose={() => setSelectedImage(null)}
+        />
+      )}
     </div>
   );
 }
