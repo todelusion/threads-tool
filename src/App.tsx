@@ -175,11 +175,10 @@ function App() {
         const codeImage = codeBlockImages.find((img) => img.id === imageId);
         if (codeImage) {
           return (
-            <img
+            <CodeToImage
               key={index}
-              src={codeImage.imageUrl}
-              alt="Code snippet"
-              className="max-w-full my-2 rounded"
+              code={codeImage.originalCode}
+              language={codeImage.originalCode.split("\n")[0] || "plaintext"}
             />
           );
         }

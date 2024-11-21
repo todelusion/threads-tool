@@ -24,20 +24,44 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
   }, [code, language]);
 
   const generateFullImage = async () => {
-    if (codeRef.current) {
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        const dataUrl = await htmlToImage.toPng(codeRef.current, {
-          backgroundColor: "#2d2d2d",
-          style: {
-            padding: "20px",
-            borderRadius: "8px",
-          },
-        });
-        setFullImageUrl(dataUrl);
-      } catch (error) {
-        console.error("Error generating full image:", error);
-      }
+    // 創建一個臨時的完整程式碼區塊（無高度限制）
+    const tempDiv = document.createElement("div");
+    tempDiv.style.position = "absolute";
+    tempDiv.style.left = "-9999px";
+    tempDiv.style.top = "-9999px";
+    document.body.appendChild(tempDiv);
+
+    const pre = document.createElement("pre");
+    pre.className = "rounded-lg p-4 bg-[#2d2d2d]";
+    pre.style.margin = "0";
+    pre.style.width = "590px";
+    // 移除任何高度限制
+    pre.style.maxHeight = "none";
+    pre.style.overflow = "visible";
+
+    const codeElement = document.createElement("code");
+    codeElement.className = `language-${language}`;
+    codeElement.textContent = code;
+
+    pre.appendChild(codeElement);
+    tempDiv.appendChild(pre);
+
+    try {
+      Prism.highlightElement(codeElement);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const dataUrl = await htmlToImage.toPng(pre, {
+        backgroundColor: "#2d2d2d",
+        style: {
+          padding: "20px",
+          borderRadius: "8px",
+        },
+      });
+      setFullImageUrl(dataUrl);
+    } catch (error) {
+      console.error("Error generating full image:", error);
+    } finally {
+      document.body.removeChild(tempDiv);
     }
   };
 
@@ -57,11 +81,10 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
       <div className="max-h-[314px] overflow-auto rounded-lg">
         <pre
           ref={codeRef}
-          className="rounded-lg p-4 bg-[#2d2d2d] overflow-x-auto"
+          className="rounded-lg p-4 bg-[#2d2d2d]"
           style={{
             margin: 0,
-            minWidth: "300px",
-            maxWidth: "100%",
+            width: "100%",
           }}
         >
           <code className={`language-${language}`}>{code}</code>
@@ -71,7 +94,7 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
         onClick={handleDownload}
         className="absolute top-2 right-2 p-2 bg-gray-800/80 hover:bg-gray-700 
                  rounded-full opacity-0 group-hover:opacity-100 transition-opacity
-                 text-white cursor-pointer"
+                 text-white cursor-pointer z-10"
         title="Download full image"
       >
         <Download size={16} />
@@ -84,35 +107,40 @@ export const generateCodeImage = async (
   code: string,
   language: string
 ): Promise<string | null> => {
-  const element = document.createElement("div");
-  element.style.width = "590px";
-  document.body.appendChild(element);
+  // 創建臨時元素（無滾動條）
+  const tempDiv = document.createElement("div");
+  tempDiv.style.position = "absolute";
+  tempDiv.style.left = "-9999px";
+  tempDiv.style.top = "-9999px";
+  document.body.appendChild(tempDiv);
 
-  const root = createRoot(element);
-  root.render(<CodeToImage code={code} language={language} />);
+  const pre = document.createElement("pre");
+  pre.className = "rounded-lg p-4 bg-[#2d2d2d]";
+  pre.style.margin = "0";
+  pre.style.width = "590px";
+
+  const codeElement = document.createElement("code");
+  codeElement.className = `language-${language}`;
+  codeElement.textContent = code;
+
+  pre.appendChild(codeElement);
+  tempDiv.appendChild(pre);
 
   try {
+    Prism.highlightElement(codeElement);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    const codeElement = element.querySelector("pre");
-    if (!codeElement) return null;
-
-    const actualHeight = Math.min(codeElement.offsetHeight, 314);
-
-    // 預覽圖片使用固定高度
-    const dataUrl = await htmlToImage.toPng(codeElement, {
+    const dataUrl = await htmlToImage.toPng(pre, {
       backgroundColor: "#2d2d2d",
       style: {
         padding: "20px",
         borderRadius: "8px",
       },
       width: 590,
-      height: actualHeight,
     });
 
     return dataUrl;
   } finally {
-    root.unmount();
-    document.body.removeChild(element);
+    document.body.removeChild(tempDiv);
   }
 };
