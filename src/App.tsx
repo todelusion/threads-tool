@@ -5,6 +5,7 @@ import { marked, Tokens } from "marked";
 import { CodeToImage, generateCodeImage } from "./CodeToImage";
 import * as htmlToImage from "html-to-image";
 import { createRoot } from "react-dom/client";
+import { debounce, throttle } from "lodash";
 
 interface MediaItem {
   id: string;
@@ -44,50 +45,68 @@ function App() {
   const [preview, setPreview] = useState<string[]>([]);
   const [originalContent, setOriginalContent] = useState("");
   const [codeBlockImages, setCodeBlockImages] = useState<CodeBlockImage[]>([]);
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const previewRef = React.useRef<HTMLDivElement>(null);
+
+  const debouncedProcessContent = useCallback(
+    debounce(async (text: string) => {
+      processContentWithCodeBlocks(text);
+    }, 500),
+    []
+  );
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
     setContent(newContent);
     setOriginalContent(newContent);
-    processContentWithCodeBlocks(newContent);
+    debouncedProcessContent(newContent);
   };
 
   const processContentWithCodeBlocks = useCallback(async (text: string) => {
+    if (!text.includes("```")) {
+      updatePreview(removeMd(text));
+      return;
+    }
+
     const tokens = marked.lexer(text);
     let processedContent = text;
     const newCodeBlockImages: CodeBlockImage[] = [];
 
-    for (const token of tokens) {
-      if (token.type === "code") {
-        const codeBlock = token as Tokens.Code;
+    const codeBlockPromises = tokens
+      .filter((token): token is Tokens.Code => token.type === "code")
+      .map(async (codeBlock) => {
         const id = Math.random().toString(36).substring(7);
-
         const imageUrl = await generateCodeImage(
           codeBlock.text,
           codeBlock.lang || "plaintext"
         );
 
-        if (imageUrl) {
-          newCodeBlockImages.push({
-            id,
-            imageUrl,
-            originalCode: codeBlock.text,
-            language: codeBlock.lang || "plaintext",
-          });
+        return { codeBlock, id, imageUrl };
+      });
 
-          const codeBlockRegex = new RegExp(
-            "```" +
-              (codeBlock.lang || "") +
-              "\\n" +
-              escapeRegExp(codeBlock.text) +
-              "\\n```",
-            "g"
-          );
-          processedContent = processedContent.replace(
-            codeBlockRegex,
-            `[Code Image ${id}]`
-          );
-        }
+    const results = await Promise.all(codeBlockPromises);
+
+    for (const { codeBlock, id, imageUrl } of results) {
+      if (imageUrl) {
+        newCodeBlockImages.push({
+          id,
+          imageUrl,
+          originalCode: codeBlock.text,
+          language: codeBlock.lang || "plaintext",
+        });
+
+        const codeBlockRegex = new RegExp(
+          "```" +
+            (codeBlock.lang || "") +
+            "\\n" +
+            escapeRegExp(codeBlock.text) +
+            "\\n```",
+          "g"
+        );
+        processedContent = processedContent.replace(
+          codeBlockRegex,
+          `[Code Image ${id}]`
+        );
       }
     }
 
@@ -199,6 +218,78 @@ function App() {
     });
   };
 
+  const processTextForLength = useCallback((text: string) => {
+    let processed = text.replace(/```[\s\S]*?```/g, "[code]");
+    processed = removeMd(processed);
+    processed = processed
+      .replace(/\*\*(.*?)\*\*/g, "$1")
+      .replace(/\*(.*?)\*/g, "$1")
+      .replace(/`(.*?)`/g, "$1")
+      .replace(/\n\s*\n/g, "\n\n")
+      .trim();
+    return processed;
+  }, []);
+
+  const handleCursorChange = useCallback(
+    throttle((e: any) => {
+      const textarea = e.target as HTMLTextAreaElement;
+      const cursorPos = textarea.selectionStart;
+      setCursorPosition(cursorPos);
+
+      const textBeforeCursor = textarea.value.substring(0, cursorPos);
+      const processedTextBeforeCursor = processTextForLength(textBeforeCursor);
+
+      let accumulatedLength = 0;
+      const blockIndex = preview.findIndex((block) => {
+        const processedBlockLength = processTextForLength(block).length;
+        const result =
+          processedTextBeforeCursor.length >= accumulatedLength &&
+          processedTextBeforeCursor.length <=
+            accumulatedLength + processedBlockLength;
+        accumulatedLength += processedBlockLength + 1;
+        return result;
+      });
+
+      if (blockIndex !== -1 && previewRef.current) {
+        const previewBlocks =
+          previewRef.current.querySelectorAll(".preview-block");
+        if (previewBlocks[blockIndex]) {
+          previewBlocks[blockIndex].scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }
+    }, 100),
+    [preview, processTextForLength]
+  );
+
+  const isActiveBlock = useCallback(
+    (index: number) => {
+      let accumulatedLength = 0;
+      const processedCursorPosition = processTextForLength(
+        content.substring(0, cursorPosition)
+      ).length;
+
+      for (let i = 0; i < preview.length; i++) {
+        const processedPost = processTextForLength(preview[i]);
+        const blockStart = accumulatedLength;
+        const blockEnd = blockStart + processedPost.length;
+
+        if (i === index) {
+          return (
+            processedCursorPosition >= blockStart &&
+            processedCursorPosition <= blockEnd
+          );
+        }
+
+        accumulatedLength += processedPost.length + 1;
+      }
+      return false;
+    },
+    [content, cursorPosition, preview, processTextForLength]
+  );
+
   return (
     <div className="min-h-screen bg-[#101010] text-white">
       <div className="max-w-6xl mx-auto px-4 pt-20 pb-4">
@@ -208,6 +299,7 @@ function App() {
               <textarea
                 value={content}
                 onChange={handleContentChange}
+                onSelect={handleCursorChange}
                 placeholder="Start a thread..."
                 className="flex-1 w-full p-4 border border-gray-800 rounded-lg focus:ring-0 text-[17px] 
                 bg-transparent text-white placeholder:text-gray-400"
@@ -233,11 +325,14 @@ function App() {
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div ref={previewRef} className="space-y-4">
             {preview.map((post, index) => (
               <div
                 key={index}
-                className="p-4 border border-gray-800 rounded-lg text-[15px] text-white whitespace-pre-line"
+                className={`preview-block p-4 border border-gray-800 rounded-lg text-[15px] text-white whitespace-pre-line
+                  ${
+                    isActiveBlock(index) ? "bg-yellow-500/20" : ""
+                  } transition-colors duration-200`}
               >
                 {renderPreviewContent(post)}
               </div>
