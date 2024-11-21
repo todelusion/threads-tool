@@ -99,7 +99,7 @@ function App() {
           return part;
         }
         return removeMd(part, {
-          stripListLeaders: true,
+          stripListLeaders: false,
           listUnicodeChar: "",
           gfm: true,
           useImgAltText: false,
