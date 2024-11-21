@@ -245,23 +245,61 @@ function App() {
     }
 
     const posts: string[] = [];
-    const lines = text.split("\n");
     let currentPost = "";
 
-    lines.forEach((line) => {
-      if (currentPost && (currentPost + "\n" + line).length > 500) {
-        posts.push(currentPost);
-        currentPost = line;
+    // Split by code block markers to handle them separately
+    const segments = text.split(/(```[\s\S]*?```)/);
+
+    segments.forEach((segment, index) => {
+      // If this is a code block, add it to current post
+      if (segment.startsWith("```")) {
+        currentPost = currentPost ? currentPost + "\n" + segment : segment;
+        return;
+      }
+
+      // Process non-code-block text
+      const parts = segment.split(/\n§§§\n/);
+      parts.forEach((part, partIndex) => {
+        // For first part, append to current post
+        if (partIndex === 0) {
+          currentPost = currentPost ? currentPost + "\n" + part : part;
+        } else {
+          // For subsequent parts after §§§, create new posts
+          if (currentPost) {
+            posts.push(currentPost.trim());
+          }
+          currentPost = part;
+        }
+      });
+    });
+
+    // Add the last post if exists
+    if (currentPost) {
+      posts.push(currentPost.trim());
+    }
+
+    // Handle length limits after splitting by §§§
+    const finalPosts: string[] = [];
+    posts.forEach((post) => {
+      if (post.length <= 500) {
+        finalPosts.push(post);
       } else {
-        currentPost = currentPost ? currentPost + "\n" + line : line;
+        // Split long posts by length
+        const lines = post.split("\n");
+        let tempPost = "";
+        lines.forEach((line) => {
+          if ((tempPost + "\n" + line).length > 500) {
+            if (tempPost) finalPosts.push(tempPost.trim());
+            tempPost = line;
+          } else {
+            tempPost = tempPost ? tempPost + "\n" + line : line;
+          }
+        });
+        if (tempPost) finalPosts.push(tempPost.trim());
       }
     });
 
-    if (currentPost) {
-      posts.push(currentPost);
-    }
-
-    setPreview(posts);
+    setPreview(finalPosts);
   }, []);
 
   const handlePost = () => {
@@ -447,9 +485,30 @@ function App() {
     );
   };
 
+  const insertPageBreak = () => {
+    const textarea = document.querySelector("textarea");
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const newContent =
+      content.substring(0, start) + "\n§§§\n" + content.substring(end);
+
+    setContent(newContent);
+
+    // Move cursor after the page break
+    setTimeout(() => {
+      textarea.selectionStart = start + 5;
+      textarea.selectionEnd = start + 5;
+      textarea.focus();
+    }, 0);
+
+    debouncedProcessContent(newContent);
+  };
+
   return (
     <div className="min-h-screen bg-[#101010] text-white">
-      <div className="max-w-6xl mx-auto px-4 pt-20 pb-4">
+      <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-2 gap-8">
           <div className="sticky top-20 h-[calc(100vh-80px)]">
             <div className="space-y-4 h-full flex flex-col">
@@ -458,11 +517,21 @@ function App() {
                 onChange={handleContentChange}
                 onSelect={handleCursorChange}
                 placeholder="Start a thread..."
-                className="flex-1 w-full p-4 border border-gray-800 rounded-lg focus:ring-0 text-[15px] 
+                className="flex-1 w-full p-4 border border-gray-800 rounded-lg focus:ring-0 text-[15px] resize-none 
                 bg-transparent text-white placeholder:text-gray-400"
               />
 
-              <div className="flex items-center justify-end pt-2 border-t border-gray-800 pb-10">
+              <div className="flex items-center justify-between pt-2 border-t border-gray-800 pb-10">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={insertPageBreak}
+                    className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800"
+                    title="Insert page break"
+                  >
+                    <FileText size={20} />
+                  </button>
+                </div>
+
                 <div className="flex items-center gap-4">
                   <span className="text-sm text-gray-400">
                     {content.length}/500
