@@ -1,15 +1,57 @@
 import React, { useEffect, useRef, useState } from "react";
 import Prism from "prismjs";
-import "prismjs/themes/prism-tomorrow.css";
-import "prismjs/components/prism-json";
-import "prismjs/components/prism-graphql";
+import "prism-themes/themes/prism-vsc-dark-plus.css";
 import * as htmlToImage from "html-to-image";
-import { createRoot } from "react-dom/client";
-import { Download } from "lucide-react"; // 假設你使用 lucide-react 圖標
+import { Download } from "lucide-react";
+import "prismjs/components/prism-typescript";
+import "prismjs/components/prism-javascript";
+import "prismjs/components/prism-jsx";
+import "prismjs/components/prism-tsx";
+import "prismjs/components/prism-bash";
+import "prismjs/components/prism-json";
+import "prismjs/components/prism-markdown";
+import "prismjs/components/prism-python";
+import "prismjs/components/prism-java";
+import "prismjs/components/prism-c";
+import "prismjs/components/prism-cpp";
+import "prismjs/components/prism-csharp";
+import "prismjs/components/prism-go";
+import "prismjs/components/prism-rust";
+import "prismjs/components/prism-sql";
+import "prismjs/components/prism-yaml";
+import "prismjs/components/prism-docker";
+
+type SupportedLanguage = string;
+
+const languageMap: Record<SupportedLanguage, string> = {
+  typescript: "typescript",
+  javascript: "javascript",
+  jsx: "jsx",
+  tsx: "tsx",
+  bash: "bash",
+  json: "json",
+  markdown: "markdown",
+  python: "python",
+  java: "java",
+  c: "c",
+  cpp: "cpp",
+  csharp: "csharp",
+  go: "go",
+  rust: "rust",
+  sql: "sql",
+  yaml: "yaml",
+  docker: "dockerfile",
+  plaintext: "",
+};
+
+const loadLanguage = async (language: SupportedLanguage) => {
+  if (language === "plaintext") return;
+  return Promise.resolve();
+};
 
 interface CodeToImageProps {
   code: string;
-  language: string;
+  language: SupportedLanguage;
 }
 
 export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
@@ -17,14 +59,23 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
   const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (codeRef.current) {
-      Prism.highlightElement(codeRef.current.querySelector("code") as Element);
+    const highlight = async () => {
+      await loadLanguage(language);
+
+      if (codeRef.current) {
+        const codeElement = codeRef.current.querySelector("code");
+        if (codeElement) {
+          codeElement.className = `language-${language}`;
+          Prism.highlightElement(codeElement);
+        }
+      }
       generateFullImage();
-    }
+    };
+
+    highlight();
   }, [code, language]);
 
   const generateFullImage = async () => {
-    // 創建一個臨時的完整程式碼區塊（無高度限制）
     const tempDiv = document.createElement("div");
     tempDiv.style.position = "absolute";
     tempDiv.style.left = "-9999px";
@@ -32,10 +83,9 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
     document.body.appendChild(tempDiv);
 
     const pre = document.createElement("pre");
-    pre.className = "rounded-lg p-4 bg-[#2d2d2d]";
+    pre.className = "rounded-lg p-4 bg-[#1e1e1e]";
     pre.style.margin = "0";
     pre.style.width = "590px";
-    // 移除任何高度限制
     pre.style.maxHeight = "none";
     pre.style.overflow = "visible";
 
@@ -48,10 +98,10 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
 
     try {
       Prism.highlightElement(codeElement);
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const dataUrl = await htmlToImage.toPng(pre, {
-        backgroundColor: "#2d2d2d",
+        backgroundColor: "#1e1e1e",
         style: {
           padding: "20px",
           borderRadius: "8px",
@@ -81,7 +131,7 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
       <div className="max-h-[314px] overflow-auto rounded-lg">
         <pre
           ref={codeRef}
-          className="rounded-lg p-4 bg-[#2d2d2d]"
+          className="rounded-lg p-4 bg-[#1e1e1e]" // VSCode 背景色
           style={{
             margin: 0,
             width: "100%",
@@ -93,8 +143,8 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
       <button
         onClick={handleDownload}
         className="absolute top-2 right-2 p-2 bg-gray-800/80 hover:bg-gray-700 
-                 rounded-full opacity-0 group-hover:opacity-100 transition-opacity
-                 text-white cursor-pointer z-10"
+               rounded-full opacity-0 group-hover:opacity-100 transition-opacity
+               text-white cursor-pointer z-10"
         title="Download full image"
       >
         <Download size={16} />
@@ -105,9 +155,10 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
 
 export const generateCodeImage = async (
   code: string,
-  language: string
+  language: SupportedLanguage
 ): Promise<string | null> => {
-  // 創建臨時元素（無滾動條）
+  await loadLanguage(language);
+
   const tempDiv = document.createElement("div");
   tempDiv.style.position = "absolute";
   tempDiv.style.left = "-9999px";
@@ -131,7 +182,7 @@ export const generateCodeImage = async (
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     const dataUrl = await htmlToImage.toPng(pre, {
-      backgroundColor: "#2d2d2d",
+      backgroundColor: "#1e1e1e",
       style: {
         padding: "20px",
         borderRadius: "8px",

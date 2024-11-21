@@ -2,7 +2,7 @@ import React, { useState, useCallback } from "react";
 import { ImagePlus, Trash2, AlertCircle, Send, FileText } from "lucide-react";
 import removeMd from "remove-markdown";
 import { marked, Tokens } from "marked";
-import { CodeToImage, generateCodeImage } from "./components/CodeToImage";
+import { CodeToImage, generateCodeImage } from "./CodeToImage";
 import * as htmlToImage from "html-to-image";
 import { createRoot } from "react-dom/client";
 
@@ -16,7 +16,28 @@ interface CodeBlockImage {
   id: string;
   imageUrl: string;
   originalCode: string;
+  language: string;
 }
+
+type SupportedLanguage =
+  | "typescript"
+  | "javascript"
+  | "jsx"
+  | "tsx"
+  | "bash"
+  | "json"
+  | "markdown"
+  | "python"
+  | "java"
+  | "c"
+  | "cpp"
+  | "csharp"
+  | "go"
+  | "rust"
+  | "sql"
+  | "yaml"
+  | "docker"
+  | "plaintext";
 
 function App() {
   const [content, setContent] = useState("");
@@ -52,6 +73,7 @@ function App() {
             id,
             imageUrl,
             originalCode: codeBlock.text,
+            language: codeBlock.lang || "plaintext",
           });
 
           const codeBlockRegex = new RegExp(
@@ -155,7 +177,7 @@ function App() {
 
     return codeBlocks.map((block) => ({
       code: block.text,
-      language: block.lang || "plaintext",
+      language: (block.lang || "plaintext") as SupportedLanguage,
     }));
   };
 
@@ -174,11 +196,17 @@ function App() {
         const imageId = match[1];
         const codeImage = codeBlockImages.find((img) => img.id === imageId);
         if (codeImage) {
+          const tokens = marked.lexer(originalContent);
+          const codeBlock = tokens.find(
+            (token) =>
+              token.type === "code" && token.text === codeImage.originalCode
+          ) as Tokens.Code;
+
           return (
             <CodeToImage
               key={index}
               code={codeImage.originalCode}
-              language={codeImage.originalCode.split("\n")[0] || "plaintext"}
+              language={codeBlock?.lang || "plaintext"}
             />
           );
         }
