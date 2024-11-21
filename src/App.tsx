@@ -5,6 +5,7 @@ import { marked, Tokens } from "marked";
 import { CodeToImage, generateCodeImage } from "./CodeToImage";
 import * as htmlToImage from "html-to-image";
 import { createRoot } from "react-dom/client";
+import { debounce, throttle } from "lodash";
 
 interface MediaItem {
   id: string;
@@ -41,54 +42,71 @@ type SupportedLanguage =
 
 function App() {
   const [content, setContent] = useState("");
-  const [media, setMedia] = useState<MediaItem[]>([]);
   const [preview, setPreview] = useState<string[]>([]);
   const [originalContent, setOriginalContent] = useState("");
   const [codeBlockImages, setCodeBlockImages] = useState<CodeBlockImage[]>([]);
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const previewRef = React.useRef<HTMLDivElement>(null);
+
+  const debouncedProcessContent = useCallback(
+    debounce(async (text: string) => {
+      processContentWithCodeBlocks(text);
+    }, 500),
+    []
+  );
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
     setContent(newContent);
     setOriginalContent(newContent);
-    processContentWithCodeBlocks(newContent);
+    debouncedProcessContent(newContent);
   };
 
   const processContentWithCodeBlocks = useCallback(async (text: string) => {
+    if (!text.includes("```")) {
+      updatePreview(removeMd(text));
+      return;
+    }
+
     const tokens = marked.lexer(text);
     let processedContent = text;
     const newCodeBlockImages: CodeBlockImage[] = [];
 
-    for (const token of tokens) {
-      if (token.type === "code") {
-        const codeBlock = token as Tokens.Code;
+    const codeBlockPromises = tokens
+      .filter((token): token is Tokens.Code => token.type === "code")
+      .map(async (codeBlock) => {
         const id = Math.random().toString(36).substring(7);
-
         const imageUrl = await generateCodeImage(
           codeBlock.text,
           codeBlock.lang || "plaintext"
         );
 
-        if (imageUrl) {
-          newCodeBlockImages.push({
-            id,
-            imageUrl,
-            originalCode: codeBlock.text,
-            language: codeBlock.lang || "plaintext",
-          });
+        return { codeBlock, id, imageUrl };
+      });
 
-          const codeBlockRegex = new RegExp(
-            "```" +
-              (codeBlock.lang || "") +
-              "\\n" +
-              escapeRegExp(codeBlock.text) +
-              "\\n```",
-            "g"
-          );
-          processedContent = processedContent.replace(
-            codeBlockRegex,
-            `[Code Image ${id}]`
-          );
-        }
+    const results = await Promise.all(codeBlockPromises);
+
+    for (const { codeBlock, id, imageUrl } of results) {
+      if (imageUrl) {
+        newCodeBlockImages.push({
+          id,
+          imageUrl,
+          originalCode: codeBlock.text,
+          language: codeBlock.lang || "plaintext",
+        });
+
+        const codeBlockRegex = new RegExp(
+          "```" +
+            (codeBlock.lang || "") +
+            "\\n" +
+            escapeRegExp(codeBlock.text) +
+            "\\n```",
+          "g"
+        );
+        processedContent = processedContent.replace(
+          codeBlockRegex,
+          `[Code Image ${id}]`
+        );
       }
     }
 
@@ -144,28 +162,9 @@ function App() {
     setPreview(posts);
   }, []);
 
-  const handleMediaAdd = () => {
-    if (media.length >= 10) return;
-
-    // Simulate adding a random Unsplash image
-    const randomId = Math.floor(Math.random() * 1000);
-    const newMedia: MediaItem = {
-      id: randomId.toString(),
-      url: `https://source.unsplash.com/random/800x600?sig=${randomId}`,
-      type: "image",
-    };
-
-    setMedia([...media, newMedia]);
-  };
-
-  const removeMedia = (id: string) => {
-    setMedia(media.filter((item) => item.id !== id));
-  };
-
   const handlePost = () => {
     alert("Posts ready to be shared! (Simulation)");
     setContent("");
-    setMedia([]);
     setPreview([]);
   };
 
@@ -219,74 +218,121 @@ function App() {
     });
   };
 
+  const processTextForLength = useCallback((text: string) => {
+    let processed = text.replace(/```[\s\S]*?```/g, "[code]");
+    processed = removeMd(processed);
+    processed = processed
+      .replace(/\*\*(.*?)\*\*/g, "$1")
+      .replace(/\*(.*?)\*/g, "$1")
+      .replace(/`(.*?)`/g, "$1")
+      .replace(/\n\s*\n/g, "\n\n")
+      .trim();
+    return processed;
+  }, []);
+
+  const handleCursorChange = useCallback(
+    throttle((e: any) => {
+      const textarea = e.target as HTMLTextAreaElement;
+      const cursorPos = textarea.selectionStart;
+      setCursorPosition(cursorPos);
+
+      const textBeforeCursor = textarea.value.substring(0, cursorPos);
+      const processedTextBeforeCursor = processTextForLength(textBeforeCursor);
+
+      let accumulatedLength = 0;
+      const blockIndex = preview.findIndex((block) => {
+        const processedBlockLength = processTextForLength(block).length;
+        const result =
+          processedTextBeforeCursor.length >= accumulatedLength &&
+          processedTextBeforeCursor.length <=
+            accumulatedLength + processedBlockLength;
+        accumulatedLength += processedBlockLength + 1;
+        return result;
+      });
+
+      if (blockIndex !== -1 && previewRef.current) {
+        const previewBlocks =
+          previewRef.current.querySelectorAll(".preview-block");
+        if (previewBlocks[blockIndex]) {
+          previewBlocks[blockIndex].scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }
+    }, 100),
+    [preview, processTextForLength]
+  );
+
+  const isActiveBlock = useCallback(
+    (index: number) => {
+      let accumulatedLength = 0;
+      const processedCursorPosition = processTextForLength(
+        content.substring(0, cursorPosition)
+      ).length;
+
+      for (let i = 0; i < preview.length; i++) {
+        const processedPost = processTextForLength(preview[i]);
+        const blockStart = accumulatedLength;
+        const blockEnd = blockStart + processedPost.length;
+
+        if (i === index) {
+          return (
+            processedCursorPosition >= blockStart &&
+            processedCursorPosition <= blockEnd
+          );
+        }
+
+        accumulatedLength += processedPost.length + 1;
+      }
+      return false;
+    },
+    [content, cursorPosition, preview, processTextForLength]
+  );
+
   return (
     <div className="min-h-screen bg-[#101010] text-white">
       <div className="max-w-6xl mx-auto px-4 pt-20 pb-4">
         <div className="grid grid-cols-2 gap-8">
-          {/* 左側輸入區 */}
-          <div className="space-y-4">
-            <textarea
-              value={content}
-              onChange={handleContentChange}
-              placeholder="Start a thread..."
-              className="w-full min-h-[calc(100vh-200px)] p-4 border border-gray-800 rounded-lg focus:ring-0 text-[17px] 
-              bg-transparent text-white placeholder:text-gray-400"
-            />
+          <div className="sticky top-20 h-[calc(100vh-80px)]">
+            <div className="space-y-4 h-full flex flex-col">
+              <textarea
+                value={content}
+                onChange={handleContentChange}
+                onSelect={handleCursorChange}
+                placeholder="Start a thread..."
+                className="flex-1 w-full p-4 border border-gray-800 rounded-lg focus:ring-0 text-[17px] 
+                bg-transparent text-white placeholder:text-gray-400"
+              />
 
-            {/* Media Grid */}
-            {media.length > 0 && (
-              <div className="grid grid-cols-2 gap-2">
-                {media.map((item) => (
-                  <div key={item.id} className="relative aspect-square group">
-                    <img
-                      src={item.url}
-                      alt="Media preview"
-                      className="w-full h-full object-cover rounded-md"
-                    />
-                    <button
-                      onClick={() => removeMedia(item.id)}
-                      className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+              <div className="flex items-center justify-between pt-2 border-t border-gray-800">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePost}
+                    disabled={!content}
+                    className="px-4 py-2 bg-white text-black rounded-full text-sm font-medium disabled:opacity-50"
+                  >
+                    Post
+                  </button>
+                </div>
 
-            {/* Bottom Actions */}
-            <div className="flex items-center justify-between pt-2 border-t border-gray-800">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleMediaAdd}
-                  disabled={media.length >= 10}
-                  className="p-2 text-gray-400 hover:text-gray-200 disabled:opacity-50"
-                >
-                  <ImagePlus size={24} />
-                </button>
-                <button
-                  onClick={handlePost}
-                  disabled={!content && media.length === 0}
-                  className="px-4 py-2 bg-white text-black rounded-full text-sm font-medium disabled:opacity-50"
-                >
-                  Post
-                </button>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-400">
-                  {content.length}/500
-                </span>
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-400">
+                    {content.length}/500
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* 右側預覽區 */}
-          <div className="space-y-4">
+          <div ref={previewRef} className="space-y-4">
             {preview.map((post, index) => (
               <div
                 key={index}
-                className="p-4 border border-gray-800 rounded-lg text-[15px] text-white whitespace-pre-line"
+                className={`preview-block p-4 border border-gray-800 rounded-lg text-[15px] text-white whitespace-pre-line
+                  ${
+                    isActiveBlock(index) ? "bg-yellow-500/20" : ""
+                  } transition-colors duration-200`}
               >
                 {renderPreviewContent(post)}
               </div>
