@@ -1,5 +1,13 @@
 import React, { useState, useCallback } from "react";
-import { ImagePlus, Trash2, AlertCircle, Send, FileText } from "lucide-react";
+import {
+  ImagePlus,
+  Trash2,
+  AlertCircle,
+  Send,
+  FileText,
+  Copy,
+  Check,
+} from "lucide-react";
 import removeMd from "remove-markdown";
 import { marked, Tokens } from "marked";
 import { CodeToImage, generateCodeImage } from "./CodeToImage";
@@ -47,6 +55,7 @@ function App() {
   const [codeBlockImages, setCodeBlockImages] = useState<CodeBlockImage[]>([]);
   const [cursorPosition, setCursorPosition] = useState(0);
   const previewRef = React.useRef<HTMLDivElement>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const debouncedProcessContent = useCallback(
     debounce(async (text: string) => {
@@ -290,6 +299,19 @@ function App() {
     [content, cursorPosition, preview, processTextForLength]
   );
 
+  const copyPostContent = useCallback((post: string, index: number) => {
+    const textContent = post
+      .split(/(\[Code Image [^\]]+\])/)
+      .filter((part) => !part.startsWith("[Code Image"))
+      .join("")
+      .trim();
+
+    navigator.clipboard.writeText(textContent).then(() => {
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    });
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#101010] text-white">
       <div className="max-w-6xl mx-auto px-4 pt-20 pb-4">
@@ -301,21 +323,11 @@ function App() {
                 onChange={handleContentChange}
                 onSelect={handleCursorChange}
                 placeholder="Start a thread..."
-                className="flex-1 w-full p-4 border border-gray-800 rounded-lg focus:ring-0 text-[17px] 
+                className="flex-1 w-full p-4 border border-gray-800 rounded-lg focus:ring-0 text-[15px] 
                 bg-transparent text-white placeholder:text-gray-400"
               />
 
-              <div className="flex items-center justify-between pt-2 border-t border-gray-800">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handlePost}
-                    disabled={!content}
-                    className="px-4 py-2 bg-white text-black rounded-full text-sm font-medium disabled:opacity-50"
-                  >
-                    Post
-                  </button>
-                </div>
-
+              <div className="flex items-center justify-end pt-2 border-t border-gray-800 pb-10">
                 <div className="flex items-center gap-4">
                   <span className="text-sm text-gray-400">
                     {content.length}/500
@@ -329,11 +341,22 @@ function App() {
             {preview.map((post, index) => (
               <div
                 key={index}
-                className={`preview-block p-4 border border-gray-800 rounded-lg text-[15px] text-white whitespace-pre-line
+                className={`preview-block relative p-4 border border-gray-800 rounded-lg text-[15px] text-white whitespace-pre-line
                   ${
                     isActiveBlock(index) ? "bg-yellow-500/20" : ""
                   } transition-colors duration-200`}
               >
+                <button
+                  onClick={() => copyPostContent(post, index)}
+                  className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white transition-colors"
+                  title="Copy text"
+                >
+                  {copiedIndex === index ? (
+                    <Check size={16} className="text-green-500" />
+                  ) : (
+                    <Copy size={16} />
+                  )}
+                </button>
                 {renderPreviewContent(post)}
               </div>
             ))}

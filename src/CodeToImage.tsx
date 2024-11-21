@@ -106,6 +106,8 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
           padding: "20px",
           borderRadius: "8px",
         },
+        pixelRatio: 2,
+        quality: 1.0,
       });
       setFullImageUrl(dataUrl);
     } catch (error) {
@@ -188,6 +190,8 @@ export const generateCodeImage = async (
         borderRadius: "8px",
       },
       width: 590,
+      pixelRatio: 2,
+      quality: 1.0,
     });
 
     return dataUrl;
