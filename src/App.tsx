@@ -81,7 +81,13 @@ function App() {
 
   const processContentWithCodeBlocks = useCallback(async (text: string) => {
     if (!text.includes("```") && !text.includes("|")) {
-      updatePreview(removeMd(text));
+      updatePreview(
+        removeMd(text, {
+          listUnicodeChar: "-",
+          stripListLeaders: false,
+          useImgAltText: true,
+        })
+      );
       return;
     }
 
@@ -219,7 +225,7 @@ function App() {
         }
         return removeMd(part, {
           stripListLeaders: false,
-          listUnicodeChar: "",
+          listUnicodeChar: "-",
           gfm: true,
           useImgAltText: false,
         });
