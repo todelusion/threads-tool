@@ -106,7 +106,7 @@ const Footer = () => {
               className="underline"
               target="_blank"
             >
-              Boxi Huang.
+              Boxi Jack.
             </a>{" "}
             All rights reserved.
           </p>
