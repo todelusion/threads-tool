@@ -508,9 +508,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#101010] text-white">
-      <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-2 gap-8">
-          <div className="sticky top-20 h-[calc(100vh-80px)]">
+      <div className="max-w-6xl mx-auto pt-4 md:p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="md:sticky md:top-20 h-[calc(100vh-80px)] md:h-[calc(100vh-80px)]">
             <div className="space-y-4 h-full flex flex-col">
               <textarea
                 value={content}
@@ -521,7 +521,7 @@ function App() {
                 bg-transparent text-white placeholder:text-gray-400"
               />
 
-              <div className="flex items-center justify-between pt-2 border-t border-gray-800 pb-10">
+              <div className="flex items-center justify-between pt-2 border-t border-gray-800 pb-4 md:pb-10">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={insertPageBreak}
@@ -541,7 +541,7 @@ function App() {
             </div>
           </div>
 
-          <div ref={previewRef} className="space-y-4">
+          <div ref={previewRef} className="space-y-4 pb-20 md:pb-0">
             {preview.map((post, index) => (
               <div
                 key={index}

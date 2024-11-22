@@ -2,77 +2,82 @@ const Footer = () => {
   return (
     <footer className="font-montserrat text-white py-6 text-sm">
       <div className="max-w-6xl mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* About Section */}
-          <div>
-            <h4 className="text-lg font-bold mb-2">About</h4>
-            <p>
-              Boxi Huang, Front-End Developer. <br />
-              Specializing in React, Next.js, and modern web animation
-              frameworks.
-            </p>
-          </div>
+        {false && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* About Section */}
+            <div>
+              <h4 className="text-lg font-bold mb-2">About</h4>
+              <p>
+                Boxi Huang, Front-End Developer. <br />
+                Specializing in React, Next.js, and modern web animation
+                frameworks.
+              </p>
+            </div>
 
-          {/* Contact Section */}
-          <div>
-            <h4 className="text-lg font-bold mb-2">Contact</h4>
-            <ul>
-              <li>
-                Email:{" "}
-                <a href="mailto:todelusion@gmail.com" className="text-blue-400">
-                  todelusion@gmail.com
-                </a>
-              </li>
-              <li>
-                Phone:{" "}
-                <a href="tel:+886923608839" className="text-blue-400">
-                  0923608839
-                </a>
-              </li>
-              <li>Location: Taipei, Taiwan</li>
-            </ul>
-          </div>
+            {/* Contact Section */}
+            <div>
+              <h4 className="text-lg font-bold mb-2">Contact</h4>
+              <ul>
+                <li>
+                  Email:{" "}
+                  <a
+                    href="mailto:todelusion@gmail.com"
+                    className="text-blue-400"
+                  >
+                    todelusion@gmail.com
+                  </a>
+                </li>
+                <li>
+                  Phone:{" "}
+                  <a href="tel:+886923608839" className="text-blue-400">
+                    0923608839
+                  </a>
+                </li>
+                <li>Location: Taipei, Taiwan</li>
+              </ul>
+            </div>
 
-          {/* Links Section */}
-          <div>
-            <h4 className="text-lg font-bold mb-2">Links</h4>
-            <ul>
-              <li>
-                Portfolio:{" "}
-                <a
-                  href="https://boxi-jack.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400"
-                >
-                  boxi-jack.com
-                </a>
-              </li>
-              <li>
-                GitHub:{" "}
-                <a
-                  href="https://github.com/todelusion"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400"
-                >
-                  github.com/todelusion
-                </a>
-              </li>
-              <li>
-                LinkedIn:{" "}
-                <a
-                  href="https://www.linkedin.com/in/boxi-huang-51636b20a/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400"
-                >
-                  linkedin.com/in/boxi-huang
-                </a>
-              </li>
-            </ul>
+            {/* Links Section */}
+            <div>
+              <h4 className="text-lg font-bold mb-2">Links</h4>
+              <ul>
+                <li>
+                  Portfolio:{" "}
+                  <a
+                    href="https://boxi-jack.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400"
+                  >
+                    boxi-jack.com
+                  </a>
+                </li>
+                <li>
+                  GitHub:{" "}
+                  <a
+                    href="https://github.com/todelusion"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400"
+                  >
+                    github.com/todelusion
+                  </a>
+                </li>
+                <li>
+                  LinkedIn:{" "}
+                  <a
+                    href="https://www.linkedin.com/in/boxi-huang-51636b20a/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400"
+                  >
+                    linkedin.com/in/boxi-huang
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* About the Tool Section */}
         <div className="mt-8">
@@ -94,7 +99,17 @@ const Footer = () => {
         </div>
 
         <div className="text-center mt-6 border-t border-gray-700 pt-4">
-          <p>&copy; 2024 Boxi Huang. All rights reserved.</p>
+          <p>
+            &copy; 2024{" "}
+            <a
+              href="https://boxi-jack.com/"
+              className="underline"
+              target="_blank"
+            >
+              Boxi Huang.
+            </a>{" "}
+            All rights reserved.
+          </p>
         </div>
       </div>
     </footer>
