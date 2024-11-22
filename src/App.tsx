@@ -394,9 +394,15 @@ function App() {
 
   const handleCursorChange = useCallback(
     throttle((e: any) => {
+      // 檢查是否為平板或手機版 (< 1024px)
+      const isMobileOrTablet = window.innerWidth < 1024; // 使用 lg breakpoint
+
       const textarea = e.target as HTMLTextAreaElement;
       const cursorPos = textarea.selectionStart;
       setCursorPosition(cursorPos);
+
+      // 如果是平板或手機版，就不執行滾動功能
+      if (isMobileOrTablet) return;
 
       const textBeforeCursor = textarea.value.substring(0, cursorPos);
       const processedTextBeforeCursor = processTextForLength(textBeforeCursor);
