@@ -85,9 +85,10 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
     const pre = document.createElement("pre");
     pre.className = "rounded-lg p-4 bg-[#1e1e1e]";
     pre.style.margin = "0";
-    pre.style.width = "590px";
+    pre.style.minWidth = "590px";
     pre.style.maxHeight = "none";
     pre.style.overflow = "visible";
+    pre.style.whiteSpace = "pre";
 
     const codeElement = document.createElement("code");
     codeElement.className = `language-${language}`;
@@ -100,12 +101,15 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
       Prism.highlightElement(codeElement);
       await new Promise((resolve) => setTimeout(resolve, 200));
 
+      const actualWidth = pre.scrollWidth + 40;
+
       const dataUrl = await htmlToImage.toPng(pre, {
         backgroundColor: "#1e1e1e",
         style: {
           padding: "20px",
           borderRadius: "8px",
         },
+        width: actualWidth,
         pixelRatio: 2,
         quality: 1.0,
       });
@@ -170,7 +174,8 @@ export const generateCodeImage = async (
   const pre = document.createElement("pre");
   pre.className = "rounded-lg p-4 bg-[#2d2d2d]";
   pre.style.margin = "0";
-  pre.style.width = "590px";
+  pre.style.minWidth = "590px";
+  pre.style.whiteSpace = "pre";
 
   const codeElement = document.createElement("code");
   codeElement.className = `language-${language}`;
@@ -183,13 +188,15 @@ export const generateCodeImage = async (
     Prism.highlightElement(codeElement);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
+    const actualWidth = pre.scrollWidth + 40;
+
     const dataUrl = await htmlToImage.toPng(pre, {
       backgroundColor: "#1e1e1e",
       style: {
         padding: "20px",
         borderRadius: "8px",
       },
-      width: 590,
+      width: actualWidth,
       pixelRatio: 2,
       quality: 1.0,
     });
