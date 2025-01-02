@@ -14,6 +14,7 @@ import { CodeToImage, generateCodeImage } from "./CodeToImage";
 import * as htmlToImage from "html-to-image";
 import { createRoot } from "react-dom/client";
 import { debounce, throttle } from "lodash";
+import { Toaster } from "./components/ui/toaster";
 
 interface MediaItem {
   id: string;
@@ -519,73 +520,76 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#101010] text-white">
-      <div className="max-w-6xl mx-auto pt-4 md:p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="md:sticky md:top-20 h-[calc(100vh-80px)] md:h-[calc(100vh-80px)]">
-            <div className="space-y-4 h-full flex flex-col">
-              <textarea
-                value={content}
-                onChange={handleContentChange}
-                onSelect={handleCursorChange}
-                placeholder="Start a thread..."
-                className="flex-1 w-full p-4 border border-gray-800 rounded-lg focus:ring-0 text-[15px] resize-none 
+    <>
+      <div className="min-h-screen bg-[#101010] text-white">
+        <div className="max-w-6xl mx-auto pt-4 md:p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="md:sticky md:top-20 h-[calc(100vh-80px)] md:h-[calc(100vh-80px)]">
+              <div className="space-y-4 h-full flex flex-col">
+                <textarea
+                  value={content}
+                  onChange={handleContentChange}
+                  onSelect={handleCursorChange}
+                  placeholder="Start a thread..."
+                  className="flex-1 w-full p-4 border border-gray-800 rounded-lg focus:ring-0 text-[15px] resize-none 
                 bg-transparent text-white placeholder:text-gray-400"
-              />
+                />
 
-              <div className="flex items-center justify-between pt-2 border-t border-gray-800 pb-4 md:pb-10">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={insertPageBreak}
-                    className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800"
-                    title="Insert page break"
-                  >
-                    <FileText size={20} />
-                  </button>
-                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-gray-800 pb-4 md:pb-10">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={insertPageBreak}
+                      className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800"
+                      title="Insert page break"
+                    >
+                      <FileText size={20} />
+                    </button>
+                  </div>
 
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-400">
-                    {content.length}/500
-                  </span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-gray-400">
+                      {content.length}/500
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div ref={previewRef} className="space-y-4 pb-20 md:pb-0">
-            {preview.map((post, index) => (
-              <div
-                key={index}
-                className={`preview-block relative p-4 border border-gray-800 rounded-lg text-[15px] text-white whitespace-pre-line
+            <div ref={previewRef} className="space-y-4 pb-20 md:pb-0">
+              {preview.map((post, index) => (
+                <div
+                  key={index}
+                  className={`preview-block relative p-4 border border-gray-800 rounded-lg text-[15px] text-white whitespace-pre-line
                   ${
                     isActiveBlock(index) ? "bg-yellow-500/20" : ""
                   } transition-colors duration-200`}
-              >
-                <button
-                  onClick={() => copyPostContent(post, index)}
-                  className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white transition-colors"
-                  title="Copy text"
                 >
-                  {copiedIndex === index ? (
-                    <Check size={16} className="text-green-500" />
-                  ) : (
-                    <Copy size={16} />
-                  )}
-                </button>
-                {renderPreviewContent(post)}
-              </div>
-            ))}
+                  <button
+                    onClick={() => copyPostContent(post, index)}
+                    className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white transition-colors"
+                    title="Copy text"
+                  >
+                    {copiedIndex === index ? (
+                      <Check size={16} className="text-green-500" />
+                    ) : (
+                      <Copy size={16} />
+                    )}
+                  </button>
+                  {renderPreviewContent(post)}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+        {selectedImage && (
+          <Modal
+            imageUrl={selectedImage}
+            onClose={() => setSelectedImage(null)}
+          />
+        )}
       </div>
-      {selectedImage && (
-        <Modal
-          imageUrl={selectedImage}
-          onClose={() => setSelectedImage(null)}
-        />
-      )}
-    </div>
+      <Toaster />
+    </>
   );
 }
 

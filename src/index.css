@@ -6,4 +6,8 @@
   html {
     @apply bg-[#101010] text-white;
   }
+  :root {
+
+    --radius: 0.5rem
+  }
 }

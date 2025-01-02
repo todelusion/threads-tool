@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Prism from "prismjs";
 import "prism-themes/themes/prism-vsc-dark-plus.css";
 import * as htmlToImage from "html-to-image";
-import { Download } from "lucide-react";
+import { Download, Copy } from "lucide-react";
 import "prismjs/components/prism-typescript";
 import "prismjs/components/prism-javascript";
 import "prismjs/components/prism-jsx";
@@ -20,6 +20,7 @@ import "prismjs/components/prism-rust";
 import "prismjs/components/prism-sql";
 import "prismjs/components/prism-yaml";
 import "prismjs/components/prism-docker";
+import { useToast } from "@/hooks/use-toast";
 
 type SupportedLanguage = string;
 
@@ -55,6 +56,7 @@ interface CodeToImageProps {
 }
 
 export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
+  const { toast } = useToast();
   const codeRef = useRef<HTMLPreElement>(null);
   const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
 
@@ -129,6 +131,35 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      toast({
+        title: "Image downloaded",
+        description: "The code image has been downloaded successfully",
+      });
+    }
+  };
+
+  const handleCopyImage = async () => {
+    if (fullImageUrl) {
+      try {
+        const response = await fetch(fullImageUrl);
+        const blob = await response.blob();
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            [blob.type]: blob,
+          }),
+        ]);
+        toast({
+          title: "Image copied",
+          description: "The code image has been copied to your clipboard",
+        });
+      } catch (error) {
+        console.error("Error copying image:", error);
+        toast({
+          title: "Failed to copy image",
+          description: "Please try again",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -137,24 +168,28 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
       <div className="max-h-[314px] overflow-auto rounded-lg">
         <pre
           ref={codeRef}
-          className="rounded-lg p-4 bg-[#1e1e1e]" // VSCode 背景色
-          style={{
-            margin: 0,
-            width: "100%",
-          }}
+          className="rounded-lg p-4 bg-[#1e1e1e]"
+          style={{ margin: 0, width: "100%" }}
         >
           <code className={`language-${language}`}>{code}</code>
         </pre>
       </div>
-      <button
-        onClick={handleDownload}
-        className="absolute top-2 right-2 p-2 bg-gray-800/80 hover:bg-gray-700 
-               rounded-full opacity-0 group-hover:opacity-100 transition-opacity
-               text-white cursor-pointer z-10"
-        title="Download full image"
-      >
-        <Download size={16} />
-      </button>
+      <div className="absolute top-2 right-2 flex gap-2">
+        <button
+          onClick={handleCopyImage}
+          className="p-2 bg-gray-800/80 hover:bg-gray-700 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer z-10"
+          title="Copy image"
+        >
+          <Copy size={16} />
+        </button>
+        <button
+          onClick={handleDownload}
+          className="p-2 bg-gray-800/80 hover:bg-gray-700 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer z-10"
+          title="Download full image"
+        >
+          <Download size={16} />
+        </button>
+      </div>
     </div>
   );
 };
