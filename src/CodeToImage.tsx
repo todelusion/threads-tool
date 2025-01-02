@@ -20,6 +20,8 @@ import "prismjs/components/prism-rust";
 import "prismjs/components/prism-sql";
 import "prismjs/components/prism-yaml";
 import "prismjs/components/prism-docker";
+import "prismjs/components/prism-markup";
+import "prismjs/components/prism-css";
 import { useToast } from "@/hooks/use-toast";
 
 type SupportedLanguage = string;
@@ -42,11 +44,14 @@ const languageMap: Record<SupportedLanguage, string> = {
   sql: "sql",
   yaml: "yaml",
   docker: "dockerfile",
+  html: "markup",
+  css: "css",
   plaintext: "",
 };
 
 const loadLanguage = async (language: SupportedLanguage) => {
-  if (language === "plaintext") return;
+  const mappedLanguage = languageMap[language] || "";
+  if (mappedLanguage === "") return;
   return Promise.resolve();
 };
 
@@ -67,7 +72,8 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
       if (codeRef.current) {
         const codeElement = codeRef.current.querySelector("code");
         if (codeElement) {
-          codeElement.className = `language-${language}`;
+          const mappedLanguage = languageMap[language] || "";
+          codeElement.className = `language-${mappedLanguage}`;
           Prism.highlightElement(codeElement);
         }
       }
@@ -93,7 +99,7 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
     pre.style.whiteSpace = "pre";
 
     const codeElement = document.createElement("code");
-    codeElement.className = `language-${language}`;
+    codeElement.className = `language-${languageMap[language] || ""}`;
     codeElement.textContent = code;
 
     pre.appendChild(codeElement);
@@ -171,7 +177,9 @@ export const CodeToImage: React.FC<CodeToImageProps> = ({ code, language }) => {
           className="rounded-lg p-4 bg-[#1e1e1e]"
           style={{ margin: 0, width: "100%" }}
         >
-          <code className={`language-${language}`}>{code}</code>
+          <code className={`language-${languageMap[language] || ""}`}>
+            {code}
+          </code>
         </pre>
       </div>
       <div className="absolute top-2 right-2 flex gap-2">
@@ -213,7 +221,8 @@ export const generateCodeImage = async (
   pre.style.whiteSpace = "pre";
 
   const codeElement = document.createElement("code");
-  codeElement.className = `language-${language}`;
+  const mappedLanguage = languageMap[language] || "";
+  codeElement.className = `language-${mappedLanguage}`;
   codeElement.textContent = code;
 
   pre.appendChild(codeElement);
